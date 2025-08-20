@@ -1,6 +1,20 @@
 # NFL Data Collector
 
-A Python application for collecting and storing NFL game data, player statistics, and team information.
+A comprehensive Python web scraper for collecting NFL data from Pro Football Reference and storing it in a local PostgreSQL database. This library provides extensive coverage of NFL statistics and information.
+
+## What It Does
+
+The NFL Data Collector scrapes and stores:
+
+- **Season Data** - Complete season schedules, standings, and outcomes
+- **Team Season Statistics** - Comprehensive team performance metrics, records, and rankings
+- **Game Statistics** - Detailed game-by-game statistics for both teams
+- **Player Statistics** - Individual player performance data for each game
+- **Player Profiles** - Player biographical information, physical attributes, and career details
+
+## Data Sources
+
+All data is scraped from [Pro Football Reference](https://www.pro-football-reference.com/), a comprehensive and reliable source for NFL statistics and historical data.
 
 ## Configuration Setup
 
@@ -8,7 +22,6 @@ The application uses a flexible configuration system with the following priority
 
 1. **Local Config File** (`local_config.txt`) - Highest priority
 2. **Interactive Input** - Prompts user for database credentials
-3. **Environment Variables** - Fallback option
 
 ### Option 1: Local Config File (Recommended)
 
@@ -45,23 +58,10 @@ Enter DB_PORT (default: 5432):
 
 The application will ask if you want to save this configuration to `local_config.txt` for future use.
 
-### Option 3: Environment Variables
-
-Set these environment variables as a fallback:
-
-```bash
-export DB_HOSTNAME=localhost
-export DB_DATABASE=nfl_database
-export DB_USERNAME=your_username
-export DB_PASSWORD=your_password
-export DB_PORT=5432
-```
-
 ## Security Notes
 
 - `local_config.txt` is automatically added to `.gitignore` to prevent accidentally committing credentials
 - Never commit real database credentials to version control
-- Use the example file `local_config.txt.example` as a template
 
 ## Running the Application
 
@@ -70,3 +70,12 @@ python main.py
 ```
 
 The application will automatically detect your configuration method and proceed accordingly.
+
+## Database Schema
+
+The library creates and manages several PostgreSQL tables:
+- `game_info` - Game metadata and results
+- `game_stats` - Team statistics for each game
+- `game_player_stats` - Individual player statistics for each game
+- `player_profiles` - Player biographical information
+- `season_team_info` - Team season summaries and records
