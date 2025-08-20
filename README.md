@@ -9,7 +9,7 @@ The NFL Data Collector scrapes and stores:
 - **Season Data** - Complete season schedules, standings, and outcomes
 - **Team Season Statistics** - Comprehensive team performance metrics, records, and rankings
 - **Game Statistics** - Detailed game-by-game statistics for both teams
-- **Player Statistics** - Individual player performance data for each game
+- **Player Statistics** - Individual player performance data for each game with up to 100 metrics
 - **Player Profiles** - Player biographical information, physical attributes, and career details
 
 ## Data Sources
