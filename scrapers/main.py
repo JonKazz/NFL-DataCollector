@@ -33,7 +33,7 @@ def extract_team_links_from_season_page(url):
     
     
 def ETL_games_season_year(year: int, loader):
-    logged_urls = get_all_db_game_urls()
+    logged_urls = get_all_db_game_urls(loader)
     for week in [str(x) for x in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]]:
         game_urls = get_urls_by_week_and_year(week, year)
         for url in game_urls:
@@ -44,7 +44,7 @@ def ETL_games_season_year(year: int, loader):
 
 
 def ETL_games_season_year_and_week(year: int, week: int, loader):
-    logged_urls = get_all_db_game_urls()
+    logged_urls = get_all_db_game_urls(loader)
     game_urls = get_urls_by_week_and_year(week, year)
     for url in game_urls:
         if url not in logged_urls:

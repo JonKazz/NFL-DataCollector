@@ -4,9 +4,7 @@ from sqlalchemy.dialects.postgresql import insert
 from nfl_datacollector.config import DatabaseConfig
 
 class DatabaseLoader:
-    def __init__(self, config: DatabaseConfig = None):
-        if config is None:
-            config = DatabaseConfig.from_env()
+    def __init__(self, config: DatabaseConfig):
         self.config = config
         self.engine = None
 
@@ -378,54 +376,41 @@ class DatabaseLoader:
 
 
 # Legacy function wrappers for backward compatibility
-def get_db_connection():
-    loader = DatabaseLoader()
+def get_db_connection(loader: DatabaseLoader):
     return loader.get_connection()
 
-def get_all_db_game_urls() -> list[str]:
-    loader = DatabaseLoader()
+def get_all_db_game_urls(loader: DatabaseLoader) -> list[str]:
     return loader.get_all_game_urls()
 
-def get_all_db_player_urls() -> list[str]:
-    loader = DatabaseLoader()
+def get_all_db_player_urls(loader: DatabaseLoader) -> list[str]:
     return loader.get_all_player_urls()
 
-def create_table(query: str, table_name: str):
-    loader = DatabaseLoader()
+def create_table(query: str, table_name: str, loader: DatabaseLoader):
     loader.create_table(query, table_name)
 
-def create_game_info_table():
-    loader = DatabaseLoader()
+def create_game_info_table(loader: DatabaseLoader):
     loader.create_game_info_table()
 
-def create_game_stats_table():
-    loader = DatabaseLoader()
+def create_game_stats_table(loader: DatabaseLoader):
     loader.create_game_stats_table()
 
-def create_game_player_stats_table():
-    loader = DatabaseLoader()
+def create_game_player_stats_table(loader: DatabaseLoader):
     loader.create_game_player_stats_table()
 
-def create_player_profiles_table():
-    loader = DatabaseLoader()
+def create_player_profiles_table(loader: DatabaseLoader):
     loader.create_player_profiles_table()
 
-def insert_df(df, table_name):
-    loader = DatabaseLoader()
+def insert_df(df, table_name, loader: DatabaseLoader):
     loader.insert_df(df, table_name)
 
-def insert_game_stats_df(df):
-    loader = DatabaseLoader()
-    loader.insert_game_stats_df(df)
+def insert_game_stats_df(df, loader: DatabaseLoader):
+    loader.insert_df(df, 'game_stats')
 
-def insert_game_player_stats_df(df):
-    loader = DatabaseLoader()
-    loader.insert_game_player_stats_df(df)
+def insert_game_player_stats_df(df, loader: DatabaseLoader):
+    loader.insert_df(df, 'game_player_stats')
 
-def insert_game_info_df(df):
-    loader = DatabaseLoader()
-    loader.insert_game_info_df(df)
+def insert_game_info_df(df, loader: DatabaseLoader):
+    loader.insert_df(df, 'game_info')
 
-def insert_player_profile_df(df):
-    loader = DatabaseLoader()
-    loader.insert_player_profile_df(df)
+def insert_player_profile_df(df, loader: DatabaseLoader):
+    loader.insert_df(df, 'player_profiles')

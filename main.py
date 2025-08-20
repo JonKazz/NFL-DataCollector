@@ -11,6 +11,6 @@ from scrapers.main import ETL_games_season_year, ETL_game_page
 from load import DatabaseLoader, create_game_stats_table
 
 if __name__ == "__main__":
-    config = DatabaseConfig.from_env()
+    config = DatabaseConfig.load()
     loader = DatabaseLoader(config)
     ETL_games_season_year(2022, loader)
