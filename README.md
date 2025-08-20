@@ -58,11 +58,6 @@ Enter DB_PORT (default: 5432):
 
 The application will ask if you want to save this configuration to `local_config.txt` for future use.
 
-## Security Notes
-
-- `local_config.txt` is automatically added to `.gitignore` to prevent accidentally committing credentials
-- Never commit real database credentials to version control
-
 ## Running the Application
 
 ```bash
