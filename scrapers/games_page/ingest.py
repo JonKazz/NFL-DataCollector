@@ -25,6 +25,10 @@ DEFENSIVE_ADVANCED_TABLE_ID = 'defense_advanced'
 SNAPCOUNT_HOME_TEAM_TABLE_ID = 'home_snap_counts'
 SNAPCOUNT_VISITING_TEAM_TABLE_ID = 'vis_snap_counts'
 
+HOME_DRIVES_TABLE_ID = 'home_drives'
+VIS_DRIVES_TABLE_ID = 'vis_drives'
+SCORING_TABLE_ID = 'scoring'
+
 PLAYER_GENERAL_STATS_TABLE_IDS_LIST = [GENERAL_OFFENSIVE_STATS_TABLE_ID, GENERAL_DEFENSIVE_STATS_TABLE_ID, KICKING_STATS_TABLE_ID]
 
 PLAYER_ADVANCED_STATS_TABLE_IDS_LIST = [RETURN_STATS_TABLE_ID, PASSING_ADVANCED_TABLE_ID, RUSHING_ADVANCED_TABLE_ID, RECEIVING_ADVANCED_TABLE_ID, 
@@ -61,6 +65,7 @@ class GamePageScraper(PageScraper):
         self.game_stats_df = pd.DataFrame()
         self.game_info_df = {}
         self.game_player_stats_df = pd.DataFrame()
+        self.game_drives_df = pd.DataFrame()
         
         self.home_team_id = None
         self.away_team_id = None
@@ -95,6 +100,12 @@ class GamePageScraper(PageScraper):
         self._assign_player_team_ids()
         self.game_player_stats_df['game_id'] = self.game_id
         return self.game_player_stats_df
+    
+    
+    def get_game_drives(self) -> pd.DataFrame:
+        self._parse_drives_table()
+        self.game_drives_df['game_id'] = self.game_id
+        return self.game_drives_df
     
     
     
@@ -390,6 +401,297 @@ class GamePageScraper(PageScraper):
     
     
     
+    # ---------------------------------------------
+    # Drives Methods
+    # ---------------------------------------------
+    def _parse_drives_table(self) -> None:
+        self._parse_team_drives_table(HOME_DRIVES_TABLE_ID, self.home_team_id)
+        self._parse_team_drives_table(VIS_DRIVES_TABLE_ID, self.away_team_id)
+    
+    
+    def _parse_team_drives_table(self, table_id: str, team_id: str) -> None:
+        table = self._extract_table(table_id)
+        if table is None:
+            raise ValueError(f'[!] Drives table with id/class: ({table_id}) not found')
+        
+        rows = table.find('tbody').find_all('tr')
+        if not rows:
+            raise ValueError(f'[!] Malformed table with id={table_id}: No rows found')
+        
+        for row in rows:
+            cells = row.find_all(['th', 'td'])
+            if len(cells) != 8:
+                continue
+            
+            drive_data = {
+                'team_id': team_id,
+                'drive_num': cells[0].get_text(strip=True),
+                'quarter': cells[1].get_text(strip=True),
+                'time_start': cells[2].get_text(strip=True),
+                'start_at': cells[3].get_text(strip=True),
+                'plays': cells[4].get_text(strip=True),
+                'time_total': cells[5].get_text(strip=True),
+                'net_yds': cells[6].get_text(strip=True),
+                'end_event': cells[7].get_text(strip=True),
+                'opposing_touchdown': False,  # New feature to track opposing team touchdowns
+                'points_scored': 0  # New feature to track points scored on this drive
+            }
+            
+            # Check for scoring events on ALL drives
+            print(f"\nProcessing Drive {drive_data['drive_num']}: Q{drive_data['quarter']} - {drive_data['end_event']}")
+            print(f"  Time start: {drive_data['time_start']}, Time total: {drive_data['time_total']}")
+            
+            drive_data = self._check_scoring_event_new(drive_data)
+            
+            print(f"  Final result: Points: {drive_data['points_scored']}, Opposing TD: {drive_data['opposing_touchdown']}")
+            
+            self.game_drives_df = pd.concat([   
+                self.game_drives_df, 
+                pd.DataFrame([drive_data])
+            ], ignore_index=True)
+    
+    def _check_scoring_event(self, drive_data: dict) -> dict:
+        table = self._extract_table(SCORING_TABLE_ID)
+        if table is None:
+            return drive_data
+        
+        rows = table.find('tbody').find_all('tr')
+        
+        # Calculate when the drive ended
+        drive_end_time = self._calculate_drive_end_time(drive_data['time_start'], drive_data['time_total'])
+        drive_quarter = drive_data['quarter']
+        
+        # Determine opposing team id
+        team_id = drive_data.get('team_id')
+        opposing_team_id = self.away_team_id if team_id == self.home_team_id else self.home_team_id
+        
+        # Track current quarter and scores for calculating points
+        current_quarter = None
+        current_vis_score = 0
+        current_home_score = 0
+        previous_vis_score = 0
+        previous_home_score = 0
+        
+        # Quarter cells are only populated at the first row of each quarter section.
+        # Track the current quarter and inherit it for subsequent rows with blank quarter cells.
+        for row in rows:
+            cells = row.find_all(['th', 'td'])
+            if len(cells) < 6:  # Need at least 6 cells for all scoring info
+                continue
+            
+            quarter_cell = cells[0].get_text(strip=True)
+            if quarter_cell:
+                current_quarter = quarter_cell
+            
+            score_time = cells[1].get_text(strip=True)
+            team_name = cells[2].get_text(strip=True)
+            vis_score = int(cells[4].get_text(strip=True) or 0)
+            home_score = int(cells[5].get_text(strip=True) or 0)
+            
+            # Update previous scores before updating current scores
+            if current_quarter == drive_quarter and score_time == drive_end_time:
+                # Found the scoring event for this drive
+                if drive_data['opposing_touchdown']:
+                    # Opposing team scored - check if it's a touchdown
+                    if 'Touchdown' in cells[3].get_text(strip=True).lower():
+                        drive_data['points_scored'] = 6
+                else:
+                    # Driving team scored - calculate points based on event type
+                    if 'Touchdown' in cells[3].get_text(strip=True).lower():
+                        drive_data['points_scored'] = 6
+                    elif 'Field Goal' in cells[3].get_text(strip=True).lower():
+                        drive_data['points_scored'] = 3
+                    elif 'Safety' in cells[3].get_text(strip=True).lower():
+                        drive_data['points_scored'] = 2
+                
+                # Set the flag indicating the opposing team scored a touchdown on this drive
+                if drive_data['opposing_touchdown']:
+                    drive_data['opposing_touchdown'] = True
+                break
+            
+            # Update previous scores for next iteration
+            previous_vis_score = current_vis_score
+            previous_home_score = current_home_score
+            current_vis_score = vis_score
+            current_home_score = home_score
+        
+        return drive_data
+    
+    def _check_scoring_event_new(self, drive_data: dict) -> dict:
+        """New method to properly check for scoring events and calculate points based on score changes."""
+        table = self._extract_table(SCORING_TABLE_ID)
+        if table is None:
+            return drive_data
+        
+        rows = table.find('tbody').find_all('tr')
+        
+        # Calculate when the drive ended
+        drive_end_time = self._calculate_drive_end_time(drive_data['time_start'], drive_data['time_total'])
+        drive_quarter = drive_data['quarter']
+        
+        # Check if the drive crossed into a different quarter
+        # We need to check the original calculation before adding 15 minutes
+        original_start_min = int(drive_data['time_start'].split(':')[0])
+        original_start_sec = int(drive_data['time_start'].split(':')[1])
+        total_min = int(drive_data['time_total'].split(':')[0])
+        total_sec = int(drive_data['time_total'].split(':')[1])
+        
+        # Calculate if we would have gone negative (indicating quarter transition)
+        would_go_negative = False
+        if total_min > original_start_min:
+            would_go_negative = True
+        elif total_min == original_start_min and total_sec > original_start_sec:
+            would_go_negative = True
+            
+        if would_go_negative:
+            # When drive goes negative, it always goes to the NEXT quarter
+            quarter_map = {'1': 2, '2': 3, '3': 4, '4': 'OT', 'OT': 'OT'}
+            next_quarter = quarter_map.get(drive_quarter, drive_quarter)
+            print(f"    Drive crossed into next quarter: Q{drive_quarter} -> Q{next_quarter}")
+            search_quarter = str(next_quarter)
+        else:
+            search_quarter = drive_quarter
+            
+        print(f"    Looking for scoring event: Q{search_quarter} at {drive_end_time}")
+        
+        # Find the scoring event that matches our drive
+        scoring_event_found = False
+        print(f"    Available scoring events:")
+        
+        # First pass: find the matching scoring event and get its row index
+        matching_row_index = -1
+        for i, row in enumerate(rows):
+            cells = row.find_all(['th', 'td'])
+            if len(cells) < 6:
+                continue
+            
+            quarter_cell = cells[0].get_text(strip=True)
+            if quarter_cell:
+                current_quarter = quarter_cell
+            
+            score_time = cells[1].get_text(strip=True)
+            
+            # Check if this scoring event matches our drive
+            drive_end_seconds = self._time_to_seconds(drive_end_time)
+            score_time_seconds = self._time_to_seconds(score_time)
+            
+            if search_quarter == '5':
+                search_quarter = 'OT'
+            if current_quarter == search_quarter and score_time_seconds == drive_end_seconds:
+                matching_row_index = i
+                break
+        
+        if matching_row_index >= 0:
+            # Found the matching scoring event, now calculate the score change
+            matching_row = rows[matching_row_index]
+            cells = matching_row.find_all(['th', 'td'])
+            
+            score_time = cells[1].get_text(strip=True)
+            description = cells[3].get_text(strip=True).lower()
+            vis_score = int(cells[4].get_text(strip=True) or 0)
+            home_score = int(cells[5].get_text(strip=True) or 0)
+            
+            print(f"    MATCH FOUND! Scoring event: Q{search_quarter} at {score_time} - {description}")
+            print(f"    Drive: Q{search_quarter} at {drive_end_time} - {drive_data['end_event']}")
+            print(f"    Current scores - VIS: {vis_score}, HOME: {home_score}")
+            
+            # Find the previous scores by looking at the row before this one
+            previous_vis_score = 0
+            previous_home_score = 0
+            
+            if matching_row_index > 0:
+                prev_row = rows[matching_row_index - 1]
+                prev_cells = prev_row.find_all(['th', 'td'])
+                if len(prev_cells) >= 6:
+                    prev_vis_score = prev_cells[4].get_text(strip=True)
+                    prev_home_score = prev_cells[5].get_text(strip=True)
+                    if prev_vis_score and prev_home_score:
+                        previous_vis_score = int(prev_vis_score)
+                        previous_home_score = int(prev_home_score)
+            
+            print(f"    Previous scores - VIS: {previous_vis_score}, HOME: {previous_home_score}")
+            
+            # Calculate points based on score changes
+            vis_score_change = vis_score - previous_vis_score
+            home_score_change = home_score - previous_home_score
+            
+            print(f"    Score changes - VIS: {vis_score_change}, HOME: {home_score_change}")
+            
+            # Determine which team scored and how many points
+            if vis_score_change > 0:
+                # Visiting team scored
+                points_scored = vis_score_change
+                scoring_team = self.away_team_id
+                print(f"    Visiting team scored {points_scored} points")
+            elif home_score_change > 0:
+                # Home team scored
+                points_scored = home_score_change
+                scoring_team = self.home_team_id
+                print(f"    Home team scored {points_scored} points")
+            else:
+                # No score change
+                points_scored = 0
+                scoring_team = None
+                print(f"    No score change detected")
+            
+            # Check if this is an opposing touchdown
+            if scoring_team and scoring_team != drive_data['team_id']:
+                # The team that scored is different from the team that had the ball
+                drive_data['opposing_touchdown'] = True
+                print(f"    Opposing touchdown detected: {drive_data['team_id']} had the ball, but {scoring_team} scored")
+            else:
+                drive_data['opposing_touchdown'] = False
+            
+            drive_data['points_scored'] = points_scored
+            print(f"    Final result: Points: {drive_data['points_scored']}, Opposing TD: {drive_data['opposing_touchdown']}")
+            
+            scoring_event_found = True
+        else:
+            print(f"    No scoring event found for this drive")
+            drive_data['points_scored'] = 0
+            drive_data['opposing_touchdown'] = False
+        
+        return drive_data
+    
+    def _time_to_seconds(self, time_str: str) -> int:
+        """Convert time string (e.g., '2:46', '0:34') to total seconds."""
+        if not time_str or time_str == '':
+            return 0
+        
+        parts = time_str.split(':')
+        if len(parts) == 2:
+            minutes = int(parts[0]) if parts[0] else 0
+            seconds = int(parts[1]) if parts[1] else 0
+            return minutes * 60 + seconds
+        return 0
+    
+    def _calculate_drive_end_time(self, time_start: str, time_total: str) -> str:
+        """Calculate the end time of a drive."""
+        print(f"      Calculating drive end time: start={time_start}, total={time_total}")
+        
+        # Convert time strings to minutes and seconds
+        start_min, start_sec = map(int, time_start.split(':'))
+        total_min, total_sec = map(int, time_total.split(':'))
+        
+        # Calculate end time
+        end_sec = start_sec - total_sec
+        end_min = start_min - total_min
+        
+        # Handle borrowing
+        if end_sec < 0:
+            end_sec += 60
+            end_min -= 1
+        
+        # Handle quarter transitions (negative minutes means we crossed into previous quarter)
+        if end_min < 0:
+            end_min += 15  # Add 15 minutes for the new quarter
+            print(f"      Quarter transition detected, adjusted to: {end_min:02d}:{end_sec:02d}")
+        
+        result = f"{end_min:02d}:{end_sec:02d}"
+        print(f"      Result: {result}")
+        return result
+
+
     # ---------------------------------------------
     # Player Methods
     # ---------------------------------------------

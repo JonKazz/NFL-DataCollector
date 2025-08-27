@@ -69,6 +69,8 @@ GAME_STATS_COL_MAP = {
     'fourth_down_attempts': 'fourth_down_attempts'
 }
 
+
+
 PLAYER_STATS_COL_MAP = {
     # Identifiers
     'game_id': 'game_id',
@@ -249,6 +251,7 @@ class GamePageTransformer():
     def _modify_game_info_features(self) -> None:
         attendance_value = self.game_info_df['attendance'].iloc[0]
         
+        # --- Attendance Cleaning ---
         if pd.notna(attendance_value):
             # Process the single value
             processed_value = str(attendance_value).replace(',', '')
@@ -260,6 +263,32 @@ class GamePageTransformer():
             else:
                 self.game_info_df.loc[0, 'attendance'] = None
 
+        # --- Playoff Game Label ---
+        season_year = self.game_info_df['season_year'].iloc[0]
+        season_week = self.game_info_df['season_week'].iloc[0]
+
+        playoff_mapping_post2020 = {
+            19: 'Wild Card',
+            20: 'Divisional',
+            21: 'Conference Championship',
+            22: 'Superbowl'
+        }
+
+        playoff_mapping_pre2021 = {
+            18: 'Wild Card',
+            19: 'Divisional',
+            20: 'Conference Championship',
+            21: 'Superbowl'
+        }
+
+        playoff_game = None
+        if season_year > 2020:
+            playoff_game = playoff_mapping_post2020.get(season_week, None)
+        else:
+            playoff_game = playoff_mapping_pre2021.get(season_week, None)
+
+        self.game_info_df.loc[0, 'playoff_game'] = playoff_game
+    
     
     def _modify_game_stats_features(self) -> None:
         # Parse rushing stats into separate columns

@@ -10,48 +10,54 @@ class PlayerProfilePageScraper(PageScraper):
     def load_page(self, url: str) -> None:
         super().load_page(url)
         self.player_df['url'] = url
-        player_id = url.split('/')[-1].split('.')[0]
-        self.player_df['player_id'] = player_id
+        self.player_df['player_id'] = url.split('/')[-1].split('.')[0]
 
     def get_player_profile(self) -> pd.DataFrame:
         self._parse_player_metadata()
         return pd.DataFrame([self.player_df])
 
-    
-    def _parse_player_metadata(self) -> pd.DataFrame:
+    def _parse_player_metadata(self) -> None:
         meta = self._extract_div('meta')
         if not meta:
             raise ValueError("[!] Could not find metadata div")
-        
-        #Name
+
+        # Name
         name = meta.find('h1').find('span').get_text(strip=True)
         self.player_df['name'] = name
-        
+
+        # Image
+        self.player_df['img'] = self._extract_player_image_url(meta)
+
         # Height
         match = re.search(r'\d+-\d+', str(meta))
         if not match:
             raise ValueError('[!] Missing height')
-        height = match.group(0)
-        self.player_df['height'] = height
-        
+        self.player_df['height'] = match.group(0)
+
         # Weight
         match = re.search(r'\d+lb', str(meta))
         if not match:
-            raise ValueError('[!] Missing weight')
-        weight = match.group(0)
-        weight = weight.replace('lb', '')
-        self.player_df['weight'] = weight
-        
+            self.player_df['weight'] = pd.NA
+        else:
+            self.player_df['weight'] = match.group(0).replace('lb', '')
+
         # Date of Birth
         match = re.search(r'data-birth=["\']?(\d{4}-\d{2}-\d{2})', str(meta))
         if not match:
             raise ValueError('[!] Missing date of birth')
-        dob = match.group(1)
-        self.player_df['dob'] = dob
-    
+        self.player_df['dob'] = match.group(1)
+
         # College
         college_link = meta.find('strong', string='College')
         if not college_link:
             raise ValueError('[!] Missing college')
-        college = college_link.find_next('a').text.strip()
-        self.player_df['college'] = college
+        self.player_df['college'] = college_link.find_next('a').text.strip()
+
+    def _extract_player_image_url(self, meta) -> str | None:
+        media = meta.find('div', class_='media-item')
+        if media:
+            img = media.find('img')
+            if img:
+                return img.get('src')
+
+        return None
