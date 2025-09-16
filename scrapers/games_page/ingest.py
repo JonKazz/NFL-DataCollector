@@ -312,7 +312,7 @@ class GamePageScraper(PageScraper):
     # ---------------------------------------------
     # PlayerStats Methods
     # ---------------------------------------------
-    def _validate_and_insert_player_stat(self, player_id: str, stat_name: str, stat_value: str) -> None:
+    def _validate_and_insert_player_stat(self, player_id: str, player_name: str, stat_name: str, stat_value: str) -> None:
         # Convert empty strings to null values
         if stat_value == '':
             stat_value = pd.NA
@@ -321,7 +321,10 @@ class GamePageScraper(PageScraper):
         if ('player_id' not in self.game_player_stats_df.columns or 
              player_id not in self.game_player_stats_df['player_id'].values):
             self.game_player_stats_df = pd.concat(
-                [self.game_player_stats_df, pd.DataFrame([{'player_id': player_id}])],
+                [
+                    self.game_player_stats_df,
+                    pd.DataFrame([{'player_id': player_id, 'player_name': player_name}])
+                ],
                 ignore_index=True
             )
 
@@ -357,12 +360,15 @@ class GamePageScraper(PageScraper):
             player_id = player_cell.get('data-append-csv')
             if not player_id: # Likely a header row
                 continue
-
+            
+            a = player_cell.find('a')
+            player_name = a.get_text(strip=True) if a else player_cell.get_text(strip=True)
+            
             stats = row.find_all('td')
             for stat in stats:
                 stat_name = stat.get('data-stat')
                 stat_value = stat.get_text(strip=True)
-                self._validate_and_insert_player_stat(player_id, stat_name, stat_value)
+                self._validate_and_insert_player_stat(player_id, player_name, stat_name, stat_value)
 
     
     def _assign_player_team_ids(self) -> None:
@@ -437,14 +443,8 @@ class GamePageScraper(PageScraper):
                 'points_scored': 0  # New feature to track points scored on this drive
             }
             
-            # Check for scoring events on ALL drives
-            print(f"\nProcessing Drive {drive_data['drive_num']}: Q{drive_data['quarter']} - {drive_data['end_event']}")
-            print(f"  Time start: {drive_data['time_start']}, Time total: {drive_data['time_total']}")
-            
             drive_data = self._check_scoring_event_new(drive_data)
-            
-            print(f"  Final result: Points: {drive_data['points_scored']}, Opposing TD: {drive_data['opposing_touchdown']}")
-            
+                        
             self.game_drives_df = pd.concat([   
                 self.game_drives_df, 
                 pd.DataFrame([drive_data])
@@ -547,17 +547,10 @@ class GamePageScraper(PageScraper):
             # When drive goes negative, it always goes to the NEXT quarter
             quarter_map = {'1': 2, '2': 3, '3': 4, '4': 'OT', 'OT': 'OT'}
             next_quarter = quarter_map.get(drive_quarter, drive_quarter)
-            print(f"    Drive crossed into next quarter: Q{drive_quarter} -> Q{next_quarter}")
             search_quarter = str(next_quarter)
         else:
             search_quarter = drive_quarter
-            
-        print(f"    Looking for scoring event: Q{search_quarter} at {drive_end_time}")
-        
-        # Find the scoring event that matches our drive
-        scoring_event_found = False
-        print(f"    Available scoring events:")
-        
+                            
         # First pass: find the matching scoring event and get its row index
         matching_row_index = -1
         for i, row in enumerate(rows):
@@ -587,13 +580,8 @@ class GamePageScraper(PageScraper):
             cells = matching_row.find_all(['th', 'td'])
             
             score_time = cells[1].get_text(strip=True)
-            description = cells[3].get_text(strip=True).lower()
             vis_score = int(cells[4].get_text(strip=True) or 0)
             home_score = int(cells[5].get_text(strip=True) or 0)
-            
-            print(f"    MATCH FOUND! Scoring event: Q{search_quarter} at {score_time} - {description}")
-            print(f"    Drive: Q{search_quarter} at {drive_end_time} - {drive_data['end_event']}")
-            print(f"    Current scores - VIS: {vis_score}, HOME: {home_score}")
             
             # Find the previous scores by looking at the row before this one
             previous_vis_score = 0
@@ -608,46 +596,34 @@ class GamePageScraper(PageScraper):
                     if prev_vis_score and prev_home_score:
                         previous_vis_score = int(prev_vis_score)
                         previous_home_score = int(prev_home_score)
-            
-            print(f"    Previous scores - VIS: {previous_vis_score}, HOME: {previous_home_score}")
-            
+                        
             # Calculate points based on score changes
             vis_score_change = vis_score - previous_vis_score
             home_score_change = home_score - previous_home_score
-            
-            print(f"    Score changes - VIS: {vis_score_change}, HOME: {home_score_change}")
-            
+                        
             # Determine which team scored and how many points
             if vis_score_change > 0:
                 # Visiting team scored
                 points_scored = vis_score_change
                 scoring_team = self.away_team_id
-                print(f"    Visiting team scored {points_scored} points")
             elif home_score_change > 0:
                 # Home team scored
                 points_scored = home_score_change
                 scoring_team = self.home_team_id
-                print(f"    Home team scored {points_scored} points")
             else:
                 # No score change
                 points_scored = 0
                 scoring_team = None
-                print(f"    No score change detected")
             
             # Check if this is an opposing touchdown
             if scoring_team and scoring_team != drive_data['team_id']:
                 # The team that scored is different from the team that had the ball
                 drive_data['opposing_touchdown'] = True
-                print(f"    Opposing touchdown detected: {drive_data['team_id']} had the ball, but {scoring_team} scored")
             else:
                 drive_data['opposing_touchdown'] = False
             
             drive_data['points_scored'] = points_scored
-            print(f"    Final result: Points: {drive_data['points_scored']}, Opposing TD: {drive_data['opposing_touchdown']}")
-            
-            scoring_event_found = True
         else:
-            print(f"    No scoring event found for this drive")
             drive_data['points_scored'] = 0
             drive_data['opposing_touchdown'] = False
         
@@ -667,7 +643,6 @@ class GamePageScraper(PageScraper):
     
     def _calculate_drive_end_time(self, time_start: str, time_total: str) -> str:
         """Calculate the end time of a drive."""
-        print(f"      Calculating drive end time: start={time_start}, total={time_total}")
         
         # Convert time strings to minutes and seconds
         start_min, start_sec = map(int, time_start.split(':'))
@@ -685,10 +660,8 @@ class GamePageScraper(PageScraper):
         # Handle quarter transitions (negative minutes means we crossed into previous quarter)
         if end_min < 0:
             end_min += 15  # Add 15 minutes for the new quarter
-            print(f"      Quarter transition detected, adjusted to: {end_min:02d}:{end_sec:02d}")
         
         result = f"{end_min:02d}:{end_sec:02d}"
-        print(f"      Result: {result}")
         return result
 
 
@@ -710,8 +683,9 @@ class GamePageScraper(PageScraper):
                     raise ValueError(f'[!] Malformed table with id={table_id}: No table header cells found')
                 
                 player_id = player_cell.get('data-append-csv')
-                if not player_id: # Likely a header row
+                if not player_id or len(player_id) != 8: # Likely a header row or malformed
                     continue
+                
                 ids.add(player_id)
             return list(ids)
             

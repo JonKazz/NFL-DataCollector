@@ -5,7 +5,7 @@ from .games_page.transform import GamePageTransformer
 from load import get_all_db_game_urls, get_all_db_player_urls
 
 from .team_page.ingest import TeamPageScraper
-from .team_page.transform import transform_teams_table
+from .team_page.transform import transform_season_team_info_df
 
 from .player_page.ingest import PlayerProfilePageScraper
 
@@ -36,15 +36,12 @@ def extract_team_links_from_season_page(url):
     return team_links
     
     
-def ETL_season_team_info_season_year(year: int, loader):
-    team_ids = list(TEAM_ID_TO_CITY_MAP.keys())
-    for team_id in team_ids:
-        url = f'https://www.pro-football-reference.com/teams/{team_id}/{year}.htm'
-        ETL_season_team_info(url, loader)
-    
 def ETL_games_season_year(year: int, loader):
     logged_urls = get_all_db_game_urls(loader)
-    for week in [str(x) for x in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]]:
+    years = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21']
+    if year > 2020:
+        years.append('22')
+    for week in years:
         game_urls = get_urls_by_week_and_year(week, year)
         for url in game_urls:
             if url not in logged_urls:
@@ -79,12 +76,13 @@ def ETL_game_page(url, loader):
     df_player_stats = transformer.transform_player_stats_df()
     
     loader.insert_game_info_df(df_game_info)
-    loader.insert_game_stats_df(df_team_stats)
+    loader.insert_game_team_stats_df(df_team_stats)
     loader.insert_game_player_stats_df(df_player_stats)
     loader.insert_game_drives_df(df_game_drives)
     
 
 def ETL_player_profile(url, loader):
+    print('Scraping and inserting for:', url)
     scraper = PlayerProfilePageScraper()
     scraper.load_page(url)
     player_profile_df = scraper.get_player_profile()
@@ -92,22 +90,41 @@ def ETL_player_profile(url, loader):
     
     
 def ETL_season_team_info(url, loader):
+    print('Scraping and inserting for:', url)
     team_page = TeamPageScraper()
     team_page.load_page(url)
-    season_team_info_df = team_page.scrape_team_summary()
-    season_team_info_df = transform_teams_table(season_team_info_df)    
+    season_team_info_df = team_page.get_team_info()
+    season_team_info_df = transform_season_team_info_df(season_team_info_df)
     loader.insert_season_team_info_df(season_team_info_df)
 
+def ETL_season_team_info_by_year(season_year: int, loader):
+    team_ids = list(TEAM_ID_TO_CITY_MAP.keys())
+    for team_id in team_ids:
+        url = f'https://www.pro-football-reference.com/teams/{team_id}/{season_year}.htm'
+        ETL_season_team_info(url, loader)
+    
+    
+def ETL_season_info_by_year(season_year: int, loader):
+    scraper = SeasonPageScraper()
+    url = f'https://www.pro-football-reference.com/years/{season_year}/'
+    scraper.load_page(url)
+    
+    df_season_info = scraper.get_season_info()
+    df_season_team_seeds = scraper.get_season_team_seeds()
+    
+    df_season_info = transform_season_info_df(df_season_info)
+    
+    loader.insert_season_info_df(df_season_info)
+    loader.insert_season_team_seeds_df(df_season_team_seeds)
 
-def ETL_season_info(url, loader):
-    season_info = SeasonPageScraper()
-    season_info.load_page(url)
-    season_info_df = season_info.get_season_info()
-    season_info_df = transform_season_info_df(season_info_df)
-    loader.insert_season_info_df(season_info_df)
+
+def ETL_season_and_team_info_by_year(season_year: int, loader):
+    ETL_season_info_by_year(season_year, loader)
+    ETL_season_team_info_by_year(season_year, loader)
 
 
-def ETL_ap_team_votes(url, loader):
+def ETL_ap_team_votes_by_year(season_year: int, loader):
+    url = f'https://www.pro-football-reference.com/years/{season_year}/allpro.htm'
     scraper = AllProPageScraper()
     scraper.load_page(url)
     ap_team_votes_df = scraper.get_ap_team_votes()

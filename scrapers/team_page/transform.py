@@ -2,9 +2,10 @@ import pandas as pd
 import re
 from nfl_datacollector.utils import TEAM_ID_TO_TEAM_NAME_MAP, TEAM_ID_TO_CITY_MAP
 
-def transform_teams_table(df):
+def transform_season_team_info_df(df):
     df = parse_playoffs_column(df)
     df = parse_record_column(df)
+    df = parse_conference_column(df)
     
     df['id'] = df['team_id'] + '_' + df['year']
     df['name'] = df['team_id'].map(TEAM_ID_TO_TEAM_NAME_MAP)
@@ -28,6 +29,7 @@ def column_mapping(df):
         'wins': 'wins',
         'losses': 'losses',
         'ties': 'ties',
+        'conference': 'conference',
         'division': 'division',
         'division_rank': 'division_rank',
         'playoffs': 'playoffs',
@@ -38,7 +40,23 @@ def column_mapping(df):
         'Defensive Coordinator': 'def_coordinator',
         'Offensive Scheme': 'off_scheme',
         'Defensive Alignment': 'def_alignment',
-        'logo': 'logo'
+        'logo': 'logo',
+        
+        'total_yards_for': 'total_yards_for',
+        'total_yards_against': 'total_yards_against',
+        'turnovers': 'turnovers',           
+        'forced_turnovers': 'forced_turnovers', 
+        'pass_yards_for': 'pass_yards_for',
+        'pass_yards_against': 'pass_yards_against',
+        'pass_td_for': 'pass_td_for',
+        'pass_td_against': 'pass_td_against',
+        'pass_ints_thrown': 'pass_ints_thrown',           
+        'pass_ints': 'pass_ints',
+        'rush_yards_for': 'rush_yards_for',
+        'rush_yards_against': 'rush_yards_against',
+        'rush_td_for': 'rush_td_for',
+        'rush_td_against': 'rush_td_against',
+        'penalties_for': 'penalties_for',
     }
     df = df.rename(columns=col_map)
     df = df[list(col_map.values())]
@@ -83,4 +101,9 @@ def parse_record_column(df):
             return pd.Series([None, None, None, None, None])
 
     df[['wins', 'losses', 'ties', 'division_rank', 'division']] = df['Record'].apply(extract_all_parts)
+    return df
+
+def parse_conference_column(df):
+    # first word of the division string, e.g., "AFC West" -> "AFC"
+    df['conference'] = df['division'].str.strip().str.split(n=1).str[0].str.lower()
     return df

@@ -56,34 +56,6 @@ class DatabaseLoader:
         except Exception as e:
             print(f"Error creating {table_name} table:", e)
     
-    def create_season_team_info_table(self):
-        query = '''
-        DROP TABLE IF EXISTS season_team_info;
-        CREATE TABLE season_team_info (
-            id VARCHAR(50) PRIMARY KEY NOT NULL,
-            team_id VARCHAR(50) NOT NULL,
-            year INT NOT NULL,
-            name VARCHAR(100) NOT NULL,
-            city VARCHAR(100) NOT NULL,
-            stadium VARCHAR(500),
-            wins INT,
-            losses INT,
-            ties INT,
-            division_rank INT,
-            division VARCHAR(100),
-            playoffs VARCHAR(100),
-            points_for INT NOT NULL,
-            points_against INT NOT NULL,
-            coach VARCHAR(100),
-            off_coordinator VARCHAR(500),
-            def_coordinator VARCHAR(500),
-            off_scheme VARCHAR(500),
-            def_alignment VARCHAR(500),
-            logo VARCHAR(300) NOT NULL
-        );
-        '''
-        self.create_table(query, 'season_team_info')
-    
     
     def create_game_info_table(self):
         query = '''
@@ -164,9 +136,11 @@ class DatabaseLoader:
         query = '''
         DROP TABLE IF EXISTS game_player_stats;
         CREATE TABLE game_player_stats (
+            id VARCHAR(200) NOT NULL,
             game_id VARCHAR(50) NOT NULL,
             player_id VARCHAR(50) NOT NULL,
             team_id VARCHAR(50) NOT NULL,
+            player_name VARCHAR(200) NOT NULL,
             position VARCHAR(10),
             pass_completions REAL,
             pass_attempts REAL,
@@ -283,7 +257,8 @@ class DatabaseLoader:
             snapcounts_defense_percentage REAL,
             snapcounts_special_teams REAL,
             snapcounts_special_teams_percentage REAL,
-            PRIMARY KEY (game_id, player_id)
+            PRIMARY KEY (id),
+            CONSTRAINT fk_game FOREIGN KEY (game_id) REFERENCES game_info(game_id)
         );
         '''
         self.create_table(query, 'game_player_stats')
@@ -299,7 +274,7 @@ class DatabaseLoader:
             height VARCHAR(50) NOT NULL,
             weight VARCHAR(50),
             dob VARCHAR(50) NOT NULL,
-            college VARCHAR(100) NOT NULL,
+            college VARCHAR(100),
             url VARCHAR(200) NOT NULL,
             PRIMARY KEY (player_id)
         )
@@ -332,6 +307,51 @@ class DatabaseLoader:
         self.create_table(query, 'game_drives')
     
     
+    def create_season_team_info_table(self):
+        query = '''
+        DROP TABLE IF EXISTS season_team_info;
+        CREATE TABLE season_team_info (
+            id VARCHAR(50) PRIMARY KEY NOT NULL,
+            team_id VARCHAR(50) NOT NULL,
+            year INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            city VARCHAR(100) NOT NULL,
+            stadium VARCHAR(500),
+            wins INT,
+            losses INT,
+            ties INT,
+            conference VARCHAR(10),
+            division_rank INT,
+            division VARCHAR(100),
+            playoffs VARCHAR(100),
+            points_for INT,
+            points_against INT,
+            coach VARCHAR(100),
+            off_coordinator VARCHAR(500),
+            def_coordinator VARCHAR(500),
+            off_scheme VARCHAR(500),
+            def_alignment VARCHAR(500),
+            logo VARCHAR(300) NOT NULL,
+            total_yards_for INT,
+            total_yards_against INT,
+            turnovers INT,              
+            forced_turnovers INT, 
+            pass_yards_for INT,
+            pass_yards_against INT,
+            pass_td_for INT,
+            pass_td_against INT,
+            pass_ints_thrown INT,
+            pass_ints INT,
+            rush_yards_for INT,
+            rush_yards_against INT,
+            rush_td_for INT,
+            rush_td_against INT,
+            penalties_for INT
+        );
+        '''
+        self.create_table(query, 'season_team_info')
+
+        
     def create_season_info_table(self):
         query = '''
         DROP TABLE IF EXISTS season_info;
@@ -339,31 +359,81 @@ class DatabaseLoader:
             season_year INT PRIMARY KEY,
             url VARCHAR(200),
             sb_champ VARCHAR(100),
-            mvp_id VARCHAR(50),
-            opoy_id VARCHAR(50),
-            dpoy_id VARCHAR(50),
-            oroy_id VARCHAR(50),
-            droy_id VARCHAR(50),
+            mvp_id VARCHAR(20),
+            opoy_id VARCHAR(20),
+            dpoy_id VARCHAR(20),
+            oroy_id VARCHAR(20),
+            droy_id VARCHAR(20),
+            afc_team_seed_id VARCHAR(20),
+            nfc_team_seed_id VARCHAR(20),
+            CONSTRAINT fk_afc_team_seed FOREIGN KEY (afc_team_seed_id) REFERENCES season_team_seeds (id),
+            CONSTRAINT fk_nfc_team_seed FOREIGN KEY (nfc_team_seed_id) REFERENCES season_team_seeds (id)
         );
         '''
         self.create_table(query, 'season_info')
-    
 
+    
+    def create_season_team_seeds_table(self):
+        query = '''
+        DROP TABLE IF EXISTS season_team_seeds;
+        CREATE TABLE season_team_seeds (
+            id VARCHAR(20) PRIMARY KEY,
+            conference VARCHAR(10),
+            season_year INT,
+            seed_team_1 VARCHAR(10),
+            seed_team_2 VARCHAR(10),
+            seed_team_3 VARCHAR(10),
+            seed_team_4 VARCHAR(10),
+            seed_team_5 VARCHAR(10),
+            seed_team_6 VARCHAR(10),
+            seed_team_7 VARCHAR(10),
+            seed_team_8 VARCHAR(10),
+            seed_team_9 VARCHAR(10),
+            seed_team_10 VARCHAR(10),
+            seed_team_11 VARCHAR(10),
+            seed_team_12 VARCHAR(10),
+            seed_team_13 VARCHAR(10),
+            seed_team_14 VARCHAR(10),
+            seed_team_15 VARCHAR(10),
+            seed_team_16 VARCHAR(10),
+            seed_position_1 VARCHAR(100),
+            seed_position_2 VARCHAR(100),
+            seed_position_3 VARCHAR(100),
+            seed_position_4 VARCHAR(100),
+            seed_position_5 VARCHAR(100),
+            seed_position_6 VARCHAR(100),
+            seed_position_7 VARCHAR(100),
+            seed_position_8 VARCHAR(100),
+            seed_position_9 VARCHAR(100),
+            seed_position_10 VARCHAR(100),
+            seed_position_11 VARCHAR(100),
+            seed_position_12 VARCHAR(100),
+            seed_position_13 VARCHAR(100),
+            seed_position_14 VARCHAR(100),
+            seed_position_15 VARCHAR(100),
+            seed_position_16 VARCHAR(100)
+        );
+        '''
+        self.create_table(query, 'season_team_seeds')
+    
+    
     def create_ap_team_votes_table(self):
         query = '''
         DROP TABLE IF EXISTS ap_team_votes;
         CREATE TABLE ap_team_votes (
+            id          VARCHAR(20) NOT NULL,
             season_year INT NOT NULL,
             player_id   VARCHAR(10) NOT NULL,
-            team        VARCHAR(10) NOT NULL,
+            player_name VARCHAR(100) NOT NULL,
+            team_id     VARCHAR(10) NOT NULL,
             position    VARCHAR(10) NOT NULL,
             ap_team     INT NOT NULL,
-            PRIMARY KEY (season_year, player_id)
+            PRIMARY KEY (id)
         );
         '''
         self.create_table(query, 'ap_team_votes')
-
-    
+        
+        
     def insert_df(self, df, table_name):
         engine = self.get_engine()
         
@@ -375,12 +445,12 @@ class DatabaseLoader:
                 stmt = insert(table).values(**row.to_dict())
                 
                 # Handle conflicts based on table type
-                if table_name == 'game_stats':
+                if table_name == 'game_team_stats':
                     stmt = stmt.on_conflict_do_nothing(index_elements=['game_id', 'team_id'])
                 elif table_name == 'game_info':
                     stmt = stmt.on_conflict_do_nothing(index_elements=['game_id'])
                 elif table_name == 'game_player_stats':
-                    stmt = stmt.on_conflict_do_nothing(index_elements=['game_id', 'player_id'])
+                    stmt = stmt.on_conflict_do_nothing(index_elements=['id'])
                 elif table_name == 'player_profiles':
                     stmt = stmt.on_conflict_do_nothing(index_elements=['player_id'])
                 elif table_name == 'season_team_info':
@@ -389,8 +459,10 @@ class DatabaseLoader:
                     stmt = stmt.on_conflict_do_nothing(index_elements=['game_id', 'team_id', 'drive_num'])
                 elif table_name == 'season_info':
                     stmt = stmt.on_conflict_do_nothing(index_elements=['season_year'])
+                elif table_name == 'season_team_seeds':
+                    stmt = stmt.on_conflict_do_nothing(index_elements=['id'])
                 elif table_name == 'ap_team_votes':
-                    stmt = stmt.on_conflict_do_nothing(index_elements=['season_year', 'player_id'])
+                    stmt = stmt.on_conflict_do_nothing(index_elements=['id'])
                 else:
                     raise ValueError(f'Invalid table name: {table_name}')
                 
@@ -423,12 +495,12 @@ class DatabaseLoader:
                 
                 if table_name == 'ap_team_votes':
                     if result.rowcount == 0:
-                        print(f"Skipped duplicate for ap_team_votes year={row['season_year']}")
+                        print(f"Skipped duplicate for ap_team_votes id={row['id']}")
                     else:
-                        print(f"Inserted row for ap_team_votes year={row['season_year']}")
+                        print(f"Inserted row for ap_team_votes player_id={row['player_id']} and season_year={row['season_year']}")
     
-    def insert_game_stats_df(self, df):
-        self.insert_df(df, 'game_stats')
+    def insert_game_team_stats_df(self, df):
+        self.insert_df(df, 'game_team_stats')
     
     def insert_game_player_stats_df(self, df):
         self.insert_df(df, 'game_player_stats')
@@ -448,6 +520,9 @@ class DatabaseLoader:
     def insert_season_info_df(self, df):
         self.insert_df(df, 'season_info')
     
+    def insert_season_team_seeds_df(self, df):
+        self.insert_df(df, 'season_team_seeds')
+    
     def insert_ap_team_votes_df(self, df):
         self.insert_df(df, 'ap_team_votes')
     
@@ -461,6 +536,7 @@ class DatabaseLoader:
         self.create_game_drives_table()
         self.create_season_info_table()
         self.create_ap_team_votes_table()
+        self.create_season_team_seeds()
         print("All tables created successfully!")
 
 
@@ -496,6 +572,9 @@ def create_game_drives_table(loader: DatabaseLoader):
 def create_season_info_table(loader: DatabaseLoader):
     loader.create_season_info_table()
 
+def create_season_team_seeds(loader: DatabaseLoader):
+    loader.create_season_team_seeds_table()
+    
 def create_ap_team_votes_table(loader: DatabaseLoader):
     loader.create_ap_team_votes_table()
     
@@ -521,5 +600,8 @@ def insert_game_drives_df(df, loader: DatabaseLoader):
 def insert_season_info_df(df, loader: DatabaseLoader):
     loader.insert_df(df, 'season_info')
 
+def insert_season_team_seeds_df(df, loader: DatabaseLoader):
+    loader.insert_df(df, 'season_team_seeds')
+    
 def insert_ap_team_votes_df(df, loader: DatabaseLoader):
     loader.insert_df(df, 'ap_team_votes')

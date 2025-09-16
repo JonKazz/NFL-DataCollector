@@ -10,8 +10,7 @@ class PlayerProfilePageScraper(PageScraper):
     def load_page(self, url: str) -> None:
         super().load_page(url)
         self.player_df['url'] = url
-        self.player_df['player_id'] = url.split('/')[-1].split('.')[0]
-
+        self.player_df['player_id'] = url[-12:-4]
     def get_player_profile(self) -> pd.DataFrame:
         self._parse_player_metadata()
         return pd.DataFrame([self.player_df])
@@ -50,8 +49,9 @@ class PlayerProfilePageScraper(PageScraper):
         # College
         college_link = meta.find('strong', string='College')
         if not college_link:
-            raise ValueError('[!] Missing college')
-        self.player_df['college'] = college_link.find_next('a').text.strip()
+            self.player_df['college'] = pd.NA
+        else:
+            self.player_df['college'] = college_link.find_next('a').text.strip()
 
     def _extract_player_image_url(self, meta) -> str | None:
         media = meta.find('div', class_='media-item')

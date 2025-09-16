@@ -1,5 +1,3 @@
-"""Utility functions for NFL Data Collector."""
-
 import time
 import random
 import pandas as pd
@@ -7,7 +5,6 @@ import pandas as pd
 pd.set_option("display.max_columns", None)
 
 def polite_sleep(min_seconds: float = 6.0, max_seconds: float = 8.0) -> None:
-    """Sleep for a random duration between min_seconds and max_seconds."""
     sleep_time = random.uniform(min_seconds, max_seconds)
     time.sleep(sleep_time)
 
@@ -42,11 +39,4 @@ TEAM_ABR_TO_TEAM_ID_MAP = {
 } 
 
 
-def get_team_name(team_id: str) -> str:
-    """Get team name from team ID."""
-    return TEAM_ID_TO_TEAM_NAME_MAP.get(team_id, team_id)
-
-
-def validate_team_id(team_id: str) -> bool:
-    """Validate if a team ID is valid."""
-    return team_id in TEAM_ID_TO_TEAM_NAME_MAP 
+ALL_SEASONS = [2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015]

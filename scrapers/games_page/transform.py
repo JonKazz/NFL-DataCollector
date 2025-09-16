@@ -73,9 +73,11 @@ GAME_STATS_COL_MAP = {
 
 PLAYER_STATS_COL_MAP = {
     # Identifiers
+    'id': 'id',
     'game_id': 'game_id',
     'player_id': 'player_id',
     'team': 'team_id',
+    'player_name': 'player_name',
     'pos': 'position',
 
     # Passing Stats
@@ -377,4 +379,6 @@ class GamePageTransformer():
             lambda x: TEAM_ABR_TO_TEAM_ID_MAP.get(x, x) if x not in TEAM_ABR_TO_TEAM_ID_MAP.values() else x
         )
         
+        self.player_stats_df['id'] = self.player_stats_df['player_id'] + '_' + self.player_stats_df['game_id']
+         
         self.player_stats_df = self.player_stats_df.convert_dtypes()
